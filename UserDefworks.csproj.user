@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <StartArguments>/f:"C:\DATA\DLFE_TEST\usrdef\users.usr"</StartArguments>
+    <StartArguments>/f:"C:\1C\Авто\usrdef\users.usr"</StartArguments>
   </PropertyGroup>
 </Project>
