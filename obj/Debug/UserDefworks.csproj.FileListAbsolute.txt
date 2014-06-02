@@ -1,0 +1,9 @@
+e:\новая папка\visual studio 2012\Projects\UserDefworks\UserDefworks\bin\Debug\UserDefworks.exe.config
+e:\новая папка\visual studio 2012\Projects\UserDefworks\UserDefworks\bin\Debug\UserDefworks.exe
+e:\новая папка\visual studio 2012\Projects\UserDefworks\UserDefworks\bin\Debug\UserDefworks.pdb
+e:\новая папка\visual studio 2012\Projects\UserDefworks\UserDefworks\obj\Debug\UserDefworks.csprojResolveAssemblyReference.cache
+e:\новая папка\visual studio 2012\Projects\UserDefworks\UserDefworks\obj\Debug\UserDefworks.exe
+e:\новая папка\visual studio 2012\Projects\UserDefworks\UserDefworks\obj\Debug\UserDefworks.pdb
+C:\projects\UserDefWorks\UserDefworks\bin\Debug\UserDefworks.exe.config
+C:\projects\UserDefWorks\UserDefworks\obj\Debug\UserDefworks.exe
+C:\projects\UserDefWorks\UserDefworks\obj\Debug\UserDefworks.pdb
