@@ -184,7 +184,7 @@ namespace UserDefworks
             out IStorage ppstgOpen);
 
 
-        public static string ComputeStringMD5Hash(string instr)
+        public static string GetStringHash(string instr)
         {
             if (instr.Length == 0)
                 return "233";
@@ -203,6 +203,7 @@ namespace UserDefworks
             PasswordHash,
             FullName,
             UserCatalog,
+            RightsEnabled,
             UserInterface,
             UserRights
         }
@@ -214,6 +215,7 @@ namespace UserDefworks
             ХэшПароля,
             ПолноеИмя,
             КаталогПользователя,
+            ЗаданыПрава,
             Интерфейс,
             НаборПрав
         }
@@ -241,10 +243,14 @@ namespace UserDefworks
                 }
                 else
                 {
-                    StartPosition = StartPosition + data[StartPosition] + 1;
-
-                    if (data[StartPosition] == 1)
-                           StartPosition += 4;
+                    if (data[StartPosition] == 1 && Count == 5)
+                    { 
+                        StartPosition += 4; 
+                    }
+                    else
+                    {
+                        StartPosition = StartPosition + data[StartPosition] + 1;
+                    }
                     
                     Count++;
                 }
@@ -252,13 +258,18 @@ namespace UserDefworks
             return StartPosition;
         }
 
-        static string GetParam(byte[] data, UserParameters paramNuber)
+        static object GetParam(byte[] data, UserParameters paramNuber)
         {
-            string param = string.Empty;
+            object param = string.Empty;
+
             int paramstart = GetPos(data, (int) paramNuber);
             if (paramNuber == UserParameters.DontCheckRights)
             {
-                param = (1-data[paramstart]).ToString();
+                param = (int)(1 - data[paramstart]);
+            }
+            else if (paramNuber == UserParameters.RightsEnabled)
+            {
+                param = (int)(data[paramstart]); 
             }
             else
                 param = Encoding.Default.GetString(data).Substring(paramstart + 1, data[paramstart]);
@@ -275,6 +286,8 @@ namespace UserDefworks
             Console.WriteLine("\r\nPress any key to exit...");
             Console.ReadKey();
         }
+
+
 
         static string CheckSum(string USRfileName)
         {
@@ -299,16 +312,157 @@ namespace UserDefworks
             return Convert.ToString(crc, 16);
         }
 
-        static string DecryptDBA(string DBAfileName)
+        static string ReadDBA(string DBAfileName)
         {
-            byte[] encryptedDBA = File.ReadAllBytes(DBAfileName);
+            byte[] ByteBuffer = File.ReadAllBytes(DBAfileName);
             byte[] SQLKey = Encoding.ASCII.GetBytes("19465912879oiuxc ensdfaiuo3i73798kjl");
-            string Connect = string.Empty;
-            for (int i = 0; i < encryptedDBA.Length; i++)
+            for (int i = 0; i < ByteBuffer.Length; i++)
             {
-                Connect += (char)(encryptedDBA[i] ^ SQLKey[i % 36]);
+                ByteBuffer[i] = (byte)(ByteBuffer[i] ^ SQLKey[i % 36]);
+             //   Connect += (char)(encryptedDBA[i] ^ SQLKey[i % 36]);
             }
+            string Connect = Encoding.ASCII.GetString(ByteBuffer);
             return Connect;
+        }
+
+
+        static bool WriteDBA(string DBAfileName, string Connect)
+        {
+            byte[] ByteBuffer = Encoding.ASCII.GetBytes(Connect);
+            byte[] SQLKey = Encoding.ASCII.GetBytes("19465912879oiuxc ensdfaiuo3i73798kjl");
+
+            for (int i = 0; i < ByteBuffer.Length; i++)
+            {
+                ByteBuffer[i] = (byte)(ByteBuffer[i] ^ SQLKey[i % 36]);
+            }
+            try
+            {
+                File.WriteAllBytes(DBAfileName, ByteBuffer);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+        static byte[] ReadIStream(IStream pIStream)
+        {
+            System.Runtime.InteropServices.ComTypes.STATSTG StreamInfo;
+            pIStream.Stat(out StreamInfo, 0);
+            byte[] data = new byte[StreamInfo.cbSize + 1];
+            pIStream.Read(data, (int)StreamInfo.cbSize, IntPtr.Zero);
+
+            return data;
+        }
+        
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct PascalString 
+        {   
+            public byte   Length;
+            public byte[] Value;
+
+            public PascalString(string InStr)
+            {
+                Value = Encoding.Default.GetBytes(InStr);
+                Length = (byte)Value.Length;
+            }
+
+            public static implicit operator PascalString(string InStr) 
+            {
+                return new PascalString(InStr);
+            }
+
+            public void FromString(string InStr) 
+            {
+                Value = Encoding.Default.GetBytes(InStr);
+                Length = (byte)(Value.Length-1);
+            }
+
+
+            override public string ToString()
+            {
+                return Encoding.Default.GetString(Value);
+            }
+
+            public byte[] Serialyse()
+            {
+                byte[] ByteBuffer = new byte[Length + 1];
+                ByteBuffer[0] = Length;
+                for (int i = 1; i < ByteBuffer.Length; i++)
+                    ByteBuffer[i] = Value[i - 1];
+
+                return ByteBuffer;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct UserItem 
+        {
+            public string Name;
+            private static int Spacer = 1;
+            public static int CheckRights = 1;
+            public PascalString HashCode;
+            public PascalString FullName;
+            public PascalString UserCatalog;
+            public static int RightsEnabled = 1;
+            public PascalString Interface;
+            public PascalString Rights;
+
+            public UserItem(byte[] data)
+            {
+                Name = "";
+                CheckRights = (int)GetParam(data, UserParameters.DontCheckRights);
+                HashCode = new PascalString((string)GetParam(data , UserParameters.PasswordHash));
+                FullName = new PascalString((string)GetParam(data, UserParameters.FullName));
+                UserCatalog = new PascalString((string)GetParam(data, UserParameters.UserCatalog));
+                RightsEnabled = (int)GetParam(data, UserParameters.RightsEnabled);
+                Interface = new PascalString((string)GetParam(data, UserParameters.UserInterface));
+                Rights = new PascalString((string)GetParam(data, UserParameters.UserRights));
+            }
+
+            public byte[] Serialyse()
+            {
+                int rawsize = 17 + HashCode.Length + FullName.Length + UserCatalog.Length + Interface.Length + Rights.Length;
+                byte[] rawdata = new byte[rawsize];
+                byte[] buffer;
+                int lastCount = 0;
+
+                buffer = BitConverter.GetBytes(Spacer);
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = BitConverter.GetBytes(CheckRights);
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = HashCode.Serialyse();
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = FullName.Serialyse();
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = UserCatalog.Serialyse();
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = BitConverter.GetBytes(RightsEnabled);
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = Interface.Serialyse();
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                buffer = Rights.Serialyse();
+                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                lastCount += buffer.Length;
+
+                return rawdata;
+            }
         }
 
         static void Main(string[] args)
@@ -365,116 +519,82 @@ namespace UserDefworks
             {
                 Console.WriteLine("Database format: SQL");
                 IsSQL = true;
-                string Connect = DecryptDBA(DBAfileName);
+                string Connect = ReadDBA(DBAfileName);
                 Console.WriteLine("Decrypted DBA: " + Connect);
 
                 //вычислим Checksum 
                 string crc = CheckSum(USRfileName);
                 Console.WriteLine("Checksum: {0}", crc); 
-
             }
 
 
             if (StgIsStorageFile(USRfileName) == 0)
             {
                 IStorage storage = null;
-                if (StgOpenStorage(
-                    USRfileName,
-                    null,
-                    STGM.DIRECT | STGM.READ | STGM.SHARE_EXCLUSIVE,
-                    IntPtr.Zero,
-                    0,
-                    out storage) == 0)
+                if (StgOpenStorage(USRfileName,null,STGM.DIRECT | STGM.READ | STGM.SHARE_EXCLUSIVE,IntPtr.Zero,0,out storage) == 0)
                 {
-                    System.Runtime.InteropServices.ComTypes.STATSTG statstg;
-                    
-                    storage.Stat(out statstg, (uint)STATFLAG.STATFLAG_DEFAULT);
-
-                    IEnumSTATSTG pIEnumStatStg = null;
-
-                    storage.EnumElements(0, IntPtr.Zero, 0, out pIEnumStatStg);
-
-                    System.Runtime.InteropServices.ComTypes.STATSTG[] regelt = { statstg };
-                    
                     uint fetched = 0;
-                    //uint res = pIEnumStatStg.Next(1, regelt, out fetched);
-
                     IStream pIStream = null;
-                    System.Runtime.InteropServices.ComTypes.STATSTG StreamInfo;
+                    IEnumSTATSTG pIEnumStatStg = null;
+                    string Container = string.Empty;
+                      System.Runtime.InteropServices.ComTypes.STATSTG statstg = new System.Runtime.InteropServices.ComTypes.STATSTG();
+                    System.Runtime.InteropServices.ComTypes.STATSTG[] regelt = {statstg};
 
-                    storage.OpenStream("Container.Contents",
-                                       IntPtr.Zero,
-                                       (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE),
-                                       0,
-                                       out pIStream);
 
-                    pIStream.Stat(out StreamInfo, 0);
+                    storage.Stat(out statstg, (uint)STATFLAG.STATFLAG_DEFAULT);
+                    storage.EnumElements(0, IntPtr.Zero, 0, out pIEnumStatStg);
+                    storage.OpenStream("Container.Contents", IntPtr.Zero, (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE), 0, out pIStream);
 
-                    byte[] data = new byte[StreamInfo.cbSize];
-                    data = new byte[(int)StreamInfo.cbSize + 1];
-                    pIStream.Read(data, (int)StreamInfo.cbSize, IntPtr.Zero);
-
-                    pIStream.Revert();
-                    
-
-                    string Container = Encoding.Default.GetString(data, 0, data.Length);
-                    
-                    
+                    byte[] data = ReadIStream(pIStream); 
+                    Marshal.ReleaseComObject(pIStream);
+                    Container = Encoding.Default.GetString(data, 0, data.Length);
+                    Console.WriteLine(Container);
 
                     while (pIEnumStatStg.Next(1, regelt, out fetched) == 0)
                     {
-                        Console.WriteLine("{0} - {1}", ((STGTY)regelt[0].type).ToString(), regelt[0].pwcsName);
+                        string filePage = regelt[0].pwcsName;
+                        string UserName = "";
+
+                        if (filePage == "Container.Contents")
+                        {
+                            break;
+                        }
+                        Console.WriteLine("{0} - {1}", ((STGTY)regelt[0].type).ToString(), filePage);
 
                         if ((STGTY)regelt[0].type == STGTY.STGTY_STREAM)
                         {
-
-                            //if (pIStream != null)
+                            //UserContainer = UserContainer.Replace("{\"Container.Contents\",{", "");
+                            //UserContainer = UserContainer.Replace("}}", "");
+                            //UserContainer = UserContainer.Replace("},{", ";");
+                            //foreach (string UserItem in UserContainer.Split(';'))
+                                //string UserName = (string)UserItem.Split(',').GetValue(2);
+                                //UserName = UserName.Replace("\"", "");
+                                //string UserPage = (string)UserItem.Split(',').GetValue(1);
+                                    
+                            storage.OpenStream(filePage,IntPtr.Zero,(uint)(STGM.READ | STGM.SHARE_EXCLUSIVE),0,out pIStream);
+                            if (pIStream != null)
                             {
-                                //pIStream.Stat(out StreamInfo, 0);
+                                data = ReadIStream(pIStream);
+                                Marshal.ReleaseComObject(pIStream);
 
-                                //byte[] data = new byte[StreamInfo.cbSize];
-                                //pIStream.Read(data, (int)StreamInfo.cbSize - 1, IntPtr.Zero);
-                                //string UserContainer = Encoding.Default.GetString(data);
-
-                                //UserContainer = UserContainer.Replace("{\"Container.Contents\",{", "");
-                                //UserContainer = UserContainer.Replace("}}", "");
-                                //UserContainer = UserContainer.Replace("},{", ";");
-                                //foreach (string UserItem in UserContainer.Split(';'))
-
+                                Console.WriteLine("-----------{0}-----------", UserName);
+                                for (int i = 0; i <= (int)UserParameters.UserRights; i++)
                                 {
-                                    //string UserName = (string)UserItem.Split(',').GetValue(2);
-                                    //UserName = UserName.Replace("\"", "");
-                                    //string UserPage = (string)UserItem.Split(',').GetValue(1);
-
-                                    string UserPage = regelt[0].pwcsName;
-                                    string UserName = ""; 
-
-                                    storage.OpenStream(UserPage,
-                                                       IntPtr.Zero,
-                                                       (uint)
-                                                       (STGM.READ | STGM.SHARE_EXCLUSIVE),
-                                                       0,
-                                                       out pIStream);
-
-                                    if (pIStream != null)
-                                    {
-                                        pIStream.Stat(out StreamInfo, 0);
-                                        data = new byte[(int)StreamInfo.cbSize + 1];
-                                        pIStream.Read(data, (int)StreamInfo.cbSize, IntPtr.Zero);
-
-                                        Console.WriteLine("-----------{0}-----------", UserName);
-                                        for (int i = 1; i <= (int)UserParameters.UserRights; i++)
-                                        {
-                                            Console.WriteLine(" {0} = {1}", (UserParamNames)i, GetParam(data, (UserParameters)i));
-                                            if (i == 2)
-                                                Console.WriteLine(" {0} = {1}", (UserParamNames)i, ComputeStringMD5Hash(string.Empty));
-                                        }
-                                        Console.WriteLine("-------------------------", UserName);
-                                    }
-
-
-
+                                    Console.WriteLine(" {0} = {1}", (UserParamNames)i, GetParam(data, (UserParameters)i));
                                 }
+                                Console.WriteLine("-------------------------", UserName);
+
+                                UserItem User = new UserItem();
+                                User.Name = "test.bin";
+                                User.FullName = "Иванов Иван Иванович";
+                                User.HashCode = GetStringHash("123");
+                                User.Interface = "Полный";
+                                User.Rights = "Администратор";
+                                User.UserCatalog = string.Empty;
+
+                                byte[] ByteBuffer = User.Serialyse();
+
+                                File.WriteAllBytes(User.Name, ByteBuffer);
 
                             }
 
