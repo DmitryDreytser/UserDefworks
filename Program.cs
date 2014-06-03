@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using System.Security.Cryptography;
 
 
 namespace UserDefworks
@@ -85,6 +86,8 @@ namespace UserDefworks
 
         void Revert();
 
+        //void Release();
+
         void EnumElements(
             /* [in] */ uint reserved1,
             /* [size_is][unique][in] */ IntPtr reserved2,
@@ -155,6 +158,14 @@ namespace UserDefworks
         STGTY_PROPERTY = 4
     }
 
+    public enum tagSTGC :int
+    { 
+      STGC_DEFAULT                             = 0,
+      STGC_OVERWRITE                           = 1,
+      STGC_ONLYIFCURRENT                       = 2,
+      STGC_DANGEROUSLYCOMMITMERELYTODISKCACHE  = 4,
+      STGC_CONSOLIDATE                         = 8
+    };
     
     class Program
     {
@@ -172,6 +183,19 @@ namespace UserDefworks
             uint reserved,
             out IStorage ppstgOpen);
 
+
+        public static string ComputeStringMD5Hash(string instr)
+        {
+            if (instr.Length == 0)
+                return "233";
+            string strHash = string.Empty;
+            foreach (byte b in new MD5CryptoServiceProvider().ComputeHash(Encoding.Default.GetBytes(instr)))
+            {
+                strHash += b.ToString("X2");
+            }
+            return strHash;
+        }        
+        
         enum UserParameters
         {
             n = 0,
@@ -183,6 +207,16 @@ namespace UserDefworks
             UserRights
         }
 
+        enum UserParamNames
+        {
+            ПустойПараметр = 0,
+            ОтключитьКонтрольПрав,
+            ХэшПароля,
+            ПолноеИмя,
+            КаталогПользователя,
+            Интерфейс,
+            НаборПрав
+        }
 
         //Возвращаяет позицию параметра указзаного номера в потоке 
         // 1 - контролировать права
@@ -234,7 +268,9 @@ namespace UserDefworks
 
         static void PrintHelp()
         {
-            Console.WriteLine("Usage: "+ Path.GetFileName(Application.ExecutablePath).ToLower()  +" [/f|-f:<1CDatabasePath>\\usrdef\\users.usr]\r\n Where:\r\n - <1CDatabasePath> : full path to 1C database catalog.");
+            Console.WriteLine("Usage: "+ Path.GetFileName(Application.ExecutablePath).ToLower()  +" [/f|-f:<1CDatabasePath>\\usrdef\\users.usr] [-l|/l]\r\n   <1CDatabasePath> : full path to 1C database catalog.");
+            Console.WriteLine("\r\n -l - list \"userdef.usr\" contents");
+            Console.WriteLine("");
             Console.WriteLine("\r\n" + Path.GetFileName(Application.ExecutablePath).ToLower() + " [/h|-h|/?|-?] - for this screen ");
             Console.WriteLine("\r\nPress any key to exit...");
             Console.ReadKey();
@@ -351,70 +387,98 @@ namespace UserDefworks
                     out storage) == 0)
                 {
                     System.Runtime.InteropServices.ComTypes.STATSTG statstg;
+                    
                     storage.Stat(out statstg, (uint)STATFLAG.STATFLAG_DEFAULT);
 
                     IEnumSTATSTG pIEnumStatStg = null;
+
                     storage.EnumElements(0, IntPtr.Zero, 0, out pIEnumStatStg);
 
                     System.Runtime.InteropServices.ComTypes.STATSTG[] regelt = { statstg };
+                    
                     uint fetched = 0;
-                    uint res = pIEnumStatStg.Next(1, regelt, out fetched);
+                    //uint res = pIEnumStatStg.Next(1, regelt, out fetched);
 
-                    if (res == 0)
+                    IStream pIStream = null;
+                    System.Runtime.InteropServices.ComTypes.STATSTG StreamInfo;
+
+                    storage.OpenStream("Container.Contents",
+                                       IntPtr.Zero,
+                                       (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE),
+                                       0,
+                                       out pIStream);
+
+                    pIStream.Stat(out StreamInfo, 0);
+
+                    byte[] data = new byte[StreamInfo.cbSize];
+                    data = new byte[(int)StreamInfo.cbSize + 1];
+                    pIStream.Read(data, (int)StreamInfo.cbSize, IntPtr.Zero);
+
+                    pIStream.Revert();
+                    
+
+                    string Container = Encoding.Default.GetString(data, 0, data.Length);
+                    
+                    
+
+                    while (pIEnumStatStg.Next(1, regelt, out fetched) == 0)
                     {
+                        Console.WriteLine("{0} - {1}", ((STGTY)regelt[0].type).ToString(), regelt[0].pwcsName);
 
-                        IStream pIStream = null;
-                        storage.OpenStream("Container.Contents",
-                                           IntPtr.Zero,
-                                           (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE),
-                                           0,
-                                           out pIStream);
-                        if (pIStream != null)
+                        if ((STGTY)regelt[0].type == STGTY.STGTY_STREAM)
                         {
-                            System.Runtime.InteropServices.ComTypes.STATSTG StreamInfo;
-                            pIStream.Stat(out StreamInfo, 0);
-                            
-                            byte[] data = new byte[StreamInfo.cbSize];
-                            pIStream.Read(data, (int)StreamInfo.cbSize - 1, IntPtr.Zero);
-                            string UserContainer = Encoding.Default.GetString(data);
 
-                            UserContainer = UserContainer.Replace("{\"Container.Contents\",{", "");
-                            UserContainer = UserContainer.Replace("}}", "");
-                            UserContainer = UserContainer.Replace("},{", ";");
-
-                            foreach (string UserItem in UserContainer.Split(';'))
+                            //if (pIStream != null)
                             {
-                                string UserName = (string)UserItem.Split(',').GetValue(2);
-                                UserName = UserName.Replace("\"", "");
+                                //pIStream.Stat(out StreamInfo, 0);
 
-                                string UserPage = (string)UserItem.Split(',').GetValue(1);
-                                UserPage = UserPage.Replace("\"", "");
+                                //byte[] data = new byte[StreamInfo.cbSize];
+                                //pIStream.Read(data, (int)StreamInfo.cbSize - 1, IntPtr.Zero);
+                                //string UserContainer = Encoding.Default.GetString(data);
 
-                                storage.OpenStream(UserPage,
-                                                   IntPtr.Zero,
-                                                   (uint)
-                                                   (STGM.READ | STGM.SHARE_EXCLUSIVE),
-                                                   0,
-                                                   out pIStream);
-                                if (pIStream != null)
+                                //UserContainer = UserContainer.Replace("{\"Container.Contents\",{", "");
+                                //UserContainer = UserContainer.Replace("}}", "");
+                                //UserContainer = UserContainer.Replace("},{", ";");
+                                //foreach (string UserItem in UserContainer.Split(';'))
+
                                 {
-                                    pIStream.Stat(out StreamInfo, 0);
-                                    data = new byte[(int)StreamInfo.cbSize + 1];
-                                    pIStream.Read(data, (int)StreamInfo.cbSize, IntPtr.Zero);
-                                    Console.WriteLine("-----------{0}-----------", UserName);
-                                    for (int i = 1; i <= (int)UserParameters.UserRights; i++)
-                                    { 
-                                        Console.WriteLine(" {0} = {1}",(UserParameters)i, GetParam(data, (UserParameters)i));
+                                    //string UserName = (string)UserItem.Split(',').GetValue(2);
+                                    //UserName = UserName.Replace("\"", "");
+                                    //string UserPage = (string)UserItem.Split(',').GetValue(1);
+
+                                    string UserPage = regelt[0].pwcsName;
+                                    string UserName = ""; 
+
+                                    storage.OpenStream(UserPage,
+                                                       IntPtr.Zero,
+                                                       (uint)
+                                                       (STGM.READ | STGM.SHARE_EXCLUSIVE),
+                                                       0,
+                                                       out pIStream);
+
+                                    if (pIStream != null)
+                                    {
+                                        pIStream.Stat(out StreamInfo, 0);
+                                        data = new byte[(int)StreamInfo.cbSize + 1];
+                                        pIStream.Read(data, (int)StreamInfo.cbSize, IntPtr.Zero);
+
+                                        Console.WriteLine("-----------{0}-----------", UserName);
+                                        for (int i = 1; i <= (int)UserParameters.UserRights; i++)
+                                        {
+                                            Console.WriteLine(" {0} = {1}", (UserParamNames)i, GetParam(data, (UserParameters)i));
+                                            if (i == 2)
+                                                Console.WriteLine(" {0} = {1}", (UserParamNames)i, ComputeStringMD5Hash(string.Empty));
+                                        }
+                                        Console.WriteLine("-------------------------", UserName);
                                     }
-                                    Console.WriteLine("-------------------------", UserName);
+
+
+
                                 }
-
-
 
                             }
 
                         }
-
                     }
                 }
             }
