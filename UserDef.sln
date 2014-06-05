@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserDefworks", "UserDefworks.csproj", "{BE7FB957-2EC7-45B7-830E-C0E96F19FDDA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsrUtility", "UsrUtility.csproj", "{BE7FB957-2EC7-45B7-830E-C0E96F19FDDA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserdefWorks", "dll\UserdefWorks\UserdefWorks.csproj", "{A11518A7-E4A3-4C26-930F-EFB9D74D57FA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,6 +15,11 @@ Global
 		{BE7FB957-2EC7-45B7-830E-C0E96F19FDDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BE7FB957-2EC7-45B7-830E-C0E96F19FDDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BE7FB957-2EC7-45B7-830E-C0E96F19FDDA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A11518A7-E4A3-4C26-930F-EFB9D74D57FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A11518A7-E4A3-4C26-930F-EFB9D74D57FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A11518A7-E4A3-4C26-930F-EFB9D74D57FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A11518A7-E4A3-4C26-930F-EFB9D74D57FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A11518A7-E4A3-4C26-930F-EFB9D74D57FA}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
