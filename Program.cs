@@ -29,19 +29,12 @@ namespace Program
         {
             Console.WriteLine("Userdef Works utility (c) MadDAD 2014\r\n");
             
-            
-
-            //Assembly UDassembly = Assembly.LoadFrom("UserdefWorks.dll");
-
-            //Type UDtype = UDassembly.GetType("UserDefworks");
-
-            //dynamic UserDefworks = Activator.CreateInstance(UDtype);
-
             string USRfileName = string.Empty;
             string Connect = string.Empty;
             string DBCatalog = string.Empty;
             string DBAfileName = string.Empty;
             bool CreateNew = false;
+            bool list = false;
 
             if (args.Length != 0)
             {
@@ -57,6 +50,9 @@ namespace Program
                         case "d":
                             DBCatalog = parameter.Substring(3).Replace("\"", "").Replace("'", "");
                             break;
+                        case "l":
+                            list = true;
+                            break;
                         case "?":
                         case "h":
                             PrintHelp();
@@ -67,7 +63,6 @@ namespace Program
 
             if (USRfileName == string.Empty)
             {
-
                 PrintHelp();
                 return;
             }
@@ -143,15 +138,16 @@ namespace Program
             //Добавим нового пользователя
             Users.Add(new UserDefworks.UserDefworks.UserItem("User-2", 1, UserDefworks.UserDefworks.GetStringHash("123"), "Иван Иванович Иванов", "./", "Админ", "Администратор","Пользователь 2"));
 
-            foreach (UserDefworks.UserDefworks.UserItem User in Users.Values)
-            {
-                Console.WriteLine("-----------{0}-----------", User.Name);
-                for (UserDefworks.UserDefworks.UserParameters i = UserDefworks.UserDefworks.UserParameters.Header; i <= UserDefworks.UserDefworks.UserParameters.UserRights; i++)
+            if(list)
+                foreach (UserDefworks.UserDefworks.UserItem User in Users.Values)
                 {
-                    Console.WriteLine("{0} : {1} ", UserDefworks.UserDefworks.UserParamNames[i], User.GetParam(i));
+                    Console.WriteLine("-----------{0}-----------", User.Name);
+                    for (UserDefworks.UserDefworks.UserParameters i = UserDefworks.UserDefworks.UserParameters.Header; i <= UserDefworks.UserDefworks.UserParameters.UserRights; i++)
+                    {
+                        Console.WriteLine("{0} : {1} ", UserDefworks.UserDefworks.UserParamNames[i], User.GetParam(i));
+                    }
+                    Console.WriteLine("-------------------------");
                 }
-                Console.WriteLine("-------------------------");
-            }
 
             try
             {

@@ -11,7 +11,6 @@ namespace UserDefworks
 {
     [Serializable]
     [ClassInterface(ClassInterfaceType.None)]
-    [ComDefaultInterface(typeof(_Assembly))]
     [ComVisible(true)]
     public abstract class UserDefworks
     {
@@ -438,6 +437,7 @@ namespace UserDefworks
         public class UsersList : Dictionary<string, UserItem>
         {
             private Dictionary<string, string> Container;
+            public bool modified = false;
 
             [ComImport]
             [Guid("0000000d-0000-0000-C000-000000000046")]
@@ -675,6 +675,7 @@ namespace UserDefworks
 
                 base.Add(Item.Name, Item);
                 Container.Add(Item.PageName, Item.Name);
+                modified = true;
             }
 
             new public void Remove(string Key)
@@ -689,6 +690,7 @@ namespace UserDefworks
                 {
                     Container.Remove(Container.Keys.ElementAt(Container.Values.ToList().IndexOf(Key)));
                 }
+                modified = true;
 
             }
 
@@ -708,6 +710,7 @@ namespace UserDefworks
                     string key = this.ElementAt(Index).Key;
                     this.Remove(key);
                     this.Add(key, value);
+                    modified = true;
                 }
             }
 
