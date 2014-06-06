@@ -7,12 +7,9 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace UserDefworks
+namespace UserDef
 {
-    [Serializable]
-    [ClassInterface(ClassInterfaceType.None)]
-    [ComVisible(true)]
-    public abstract class UserDefworks
+    public class UserDefworks
     {
         public enum UserParameters
         {
@@ -143,7 +140,11 @@ namespace UserDefworks
                 //Создание из строки
                 public PascalString(byte[] InStr, int SourceIndex = 0)
                 {
+                    if (SourceIndex >= InStr.Length)
+                        return;
                     Length = InStr[SourceIndex];
+                    if (SourceIndex + 1 + Length >= InStr.Length)
+                        Length = (byte)(InStr.Length - 1 - SourceIndex);
                     Value = new byte[Length];
                     Array.Copy(InStr, SourceIndex + 1, Value, 0, Length);
                 }
@@ -214,6 +215,7 @@ namespace UserDefworks
             public int RightsEnabled = 1;
             public PascalString UserInterface;
             public PascalString UserRights;
+            public bool modified = false;
 
             //Возвращаяет позицию указаного параметра в массиве байт потока пользователя
             // 0 - пустой параметр, заголовк записи. всегда = 1
@@ -302,6 +304,7 @@ namespace UserDefworks
                 }
                 set
                 {
+                    modified = true;
                     switch (param)
                     {
                         case UserParameters.DontCheckRights:
@@ -328,6 +331,7 @@ namespace UserDefworks
             public void SetParam(UserParameters param, dynamic value)
             {
                 this[param] = value;
+
             }
 
             public dynamic GetParam(UserParameters param)
@@ -344,6 +348,7 @@ namespace UserDefworks
                 {
                     SetParam(param, ParseByteArray(data, param));
                 }
+                modified = false;
             }
 
             //создает структуру из массива байт при присваивании
@@ -375,6 +380,7 @@ namespace UserDefworks
                 this[UserParameters.UserCatalog] = UserCatalog;
                 this[UserParameters.UserInterface] = Interface;
                 this[UserParameters.UserRights] = Rights;
+                modified = false;
             }
 
             //Возвращает массив байт для записи в поток файла
@@ -395,33 +401,42 @@ namespace UserDefworks
                 Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
                 lastCount += buffer.Length;
 
-                buffer = BitConverter.GetBytes(CheckRights);
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                for (UserParameters i = UserParameters.DontCheckRights; i <= UserParameters.UserRights; i++)
+                {
+                    dynamic param = GetParam(i);
 
-                buffer = PasswordHash;
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                    if (param.GetType().Name == "Int32")
+                        buffer = BitConverter.GetBytes(param);
+                    else
+                        buffer = param;
 
-                buffer = FullName;
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                    Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                    lastCount += buffer.Length;
+                }
 
-                buffer = UserCatalog;
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                //buffer = PasswordHash;
+                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                //lastCount += buffer.Length;
 
-                buffer = BitConverter.GetBytes(RightsEnabled);
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                //buffer = FullName;
+                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                //lastCount += buffer.Length;
 
-                buffer = UserInterface;
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                //buffer = UserCatalog;
+                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                //lastCount += buffer.Length;
 
-                buffer = UserRights;
-                Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                lastCount += buffer.Length;
+                //buffer = BitConverter.GetBytes(RightsEnabled);
+                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                //lastCount += buffer.Length;
+
+                //buffer = UserInterface;
+                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                //lastCount += buffer.Length;
+
+                //buffer = UserRights;
+                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
+                //lastCount += buffer.Length;
                 ///
                 return rawdata;
             }
@@ -628,6 +643,7 @@ namespace UserDefworks
                 : base()
             {
                 Container = new Dictionary<string, string>();
+                modified = true;
             }
 
             //разбирает строку Container.Contents в словарь
@@ -652,10 +668,13 @@ namespace UserDefworks
             //Собирает строку Container.Contents из словаря
             private string ConstructContainer()
             {
+
                 string strContainer = "{\"Container.Contents\"";
+                Container = new Dictionary<string,string>();
                 foreach (UserItem item in this.Values)
                 {
                     strContainer += string.Format(",{{\"UserItemType\",\"{0}\",\"{1}\",\"\"}}", item.PageName, item.Name);
+                    Container.Add(item.PageName, item.Name);
                 }
                 strContainer += "}";
                 return strContainer;
@@ -772,19 +791,23 @@ namespace UserDefworks
                         while (pIEnumStatStg.Next(1, regelt, out fetched) == 0)
                         {
                             string filePage = regelt[0].pwcsName;
-                            if (filePage == "Container.Contents")
+                            if (filePage != "Container.Contents")
                             {
-                                break;
-                            }
-                            string UserName = Container[filePage];
-                            if ((STGTY)regelt[0].type == STGTY.STGTY_STREAM)
-                            {
-                                storage.OpenStream(filePage, IntPtr.Zero, (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE), 0, out pIStream);
-                                if (pIStream != null)
+                                string UserName = string.Empty;
+                                if (Container.Keys.Contains(filePage))
+                                    UserName = Container[filePage];
+                                else
+                                    UserName = filePage;
+
+                                if ((STGTY)regelt[0].type == STGTY.STGTY_STREAM)
                                 {
-                                    data = ReadIStream(pIStream);
-                                    Marshal.ReleaseComObject(pIStream);
-                                    this.Add(new UserItem(data, UserName, filePage));
+                                    storage.OpenStream(filePage, IntPtr.Zero, (uint)(STGM.READ | STGM.SHARE_EXCLUSIVE), 0, out pIStream);
+                                    if (pIStream != null)
+                                    {
+                                        data = ReadIStream(pIStream);
+                                        Marshal.ReleaseComObject(pIStream);
+                                        this.Add(new UserItem(data, UserName, filePage));
+                                    }
                                 }
                             }
                         }
@@ -808,7 +831,7 @@ namespace UserDefworks
                 {
                     throw new Exception(string.Format("Файл {0} не является хранилищем списка пользователей.", USRfileName));
                 }
-
+                modified = false;
             }
 
 
@@ -820,8 +843,15 @@ namespace UserDefworks
 
             public bool Save(string USRfileName)
             {
-                string DBAfileName = Path.GetDirectoryName(Path.GetDirectoryName(USRfileName)) + "\\1cv7.dba";
-                bool IsSQL = File.Exists(DBAfileName);
+                bool IsSQL = false;
+                string DBcatalog = Path.GetDirectoryName(USRfileName);
+                if (DBcatalog != "")
+                {
+                    DBcatalog = Path.GetDirectoryName(DBcatalog) + "\\";
+                }
+                string DBAfileName = DBcatalog + "1cv7.dba";
+                IsSQL = File.Exists(DBAfileName);
+                
 
                 // Для базы SQL нужно обновить 1cv7.dba. 
                 // И если октрыт конфигуратор, он очистит параметры подключения к БД
@@ -894,10 +924,10 @@ namespace UserDefworks
                     pIStream.Commit((int)STGC.OVERWRITE);
                     Marshal.ReleaseComObject(pIStream);
                     ppstgOpen.Commit(0);
-                    foreach (var item in Container)
+                    foreach (UserItem item in this.Values)
                     {
-                        ppstgOpen.CreateStream(item.Key, (uint)(STGM.CREATE | STGM.WRITE | STGM.SHARE_EXCLUSIVE), 0, 0, out pIStream);
-                        data = base[item.Value].Serialyze();
+                        ppstgOpen.CreateStream(item.PageName, (uint)(STGM.CREATE | STGM.WRITE | STGM.SHARE_EXCLUSIVE), 0, 0, out pIStream);
+                        data = item.Serialyze();
                         pIStream.Write(data, data.Length, new IntPtr(fetched));
                         pIStream.Commit((int)STGC.OVERWRITE);
                         Marshal.ReleaseComObject(pIStream);
@@ -923,7 +953,7 @@ namespace UserDefworks
                     if (File.Exists(DBAfileName))
                     {
                         string Connect = ReadDBA(DBAfileName);
-                        Console.WriteLine("New Checksum: {0}", CheckSum(USRfileName));
+                       // Console.WriteLine("New Checksum: {0}", CheckSum(USRfileName));
                         Connect = string.Format("{0}{1}}}}}", Connect.Substring(0, Connect.IndexOf("sum\",") + 5), CheckSum(USRfileName));
                         WriteDBA(DBAfileName, Connect);
                     }
