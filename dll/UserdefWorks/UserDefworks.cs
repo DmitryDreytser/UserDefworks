@@ -386,11 +386,8 @@ namespace UserDef
             //Возвращает массив байт для записи в поток файла
             public byte[] Serialyze()
             {
-                //посчитаем размер массива. 17 = числовые поля плюс по 1 байту на каждое строковое поле для хранения длины.
-                int rawsize = 17 + PasswordHash.Length + FullName.Length + UserCatalog.Length + UserInterface.Length + UserRights.Length;
-
-                //1C отказывается принимать файлы у которых длина записи не кратна 128
-                rawsize = (rawsize / 128 + 1) * 128;
+                //посчитаем размер массива. 17 = числовые поля плюс по 1 байту на каждое строковое поле для хранения длины. В конце должны быть Int(0)
+                int rawsize = 17 + PasswordHash.Length + FullName.Length + UserCatalog.Length + UserInterface.Length + UserRights.Length + 4;
 
                 byte[] rawdata = new byte[rawsize];
                 byte[] buffer;
@@ -414,30 +411,6 @@ namespace UserDef
                     lastCount += buffer.Length;
                 }
 
-                //buffer = PasswordHash;
-                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                //lastCount += buffer.Length;
-
-                //buffer = FullName;
-                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                //lastCount += buffer.Length;
-
-                //buffer = UserCatalog;
-                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                //lastCount += buffer.Length;
-
-                //buffer = BitConverter.GetBytes(RightsEnabled);
-                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                //lastCount += buffer.Length;
-
-                //buffer = UserInterface;
-                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                //lastCount += buffer.Length;
-
-                //buffer = UserRights;
-                //Array.Copy(buffer, 0, rawdata, lastCount, buffer.Length);
-                //lastCount += buffer.Length;
-                ///
                 return rawdata;
             }
 
